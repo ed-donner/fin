@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { ConnectionStatus } from "@/components/Header";
 
 export interface PriceUpdate {
@@ -71,10 +71,14 @@ export function useMarketData() {
     };
   }, [connect]);
 
+  // Snapshot ref into a render-safe value keyed on historyVersion
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const priceHistory = useMemo(() => historyRef.current, [historyVersion]);
+
   return {
     prices,
     connectionStatus: status,
-    priceHistory: historyRef.current,
+    priceHistory,
     historyVersion,
   };
 }
