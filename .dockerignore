@@ -1,0 +1,12 @@
+.git
+.beads
+.runtime
+.claude
+.logs
+.env
+db/
+node_modules/
+__pycache__/
+.venv/
+.next/
+out/
