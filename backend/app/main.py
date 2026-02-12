@@ -14,18 +14,18 @@ from app.market.provider import create_provider
 from app.market.stream import router as stream_router
 from app.portfolio import router as portfolio_router
 from app.watchlist import router as watchlist_router
-from app.snapshots import snapshot_loop
+from app.snapshots import start_snapshot_recorder, stop_snapshot_recorder
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database, start market data provider and background tasks."""
+    """Initialize database, start market data provider and snapshot recorder."""
     await init_db()
     provider = create_provider()
     await provider.start()
-    task = asyncio.create_task(snapshot_loop())
+    start_snapshot_recorder()
     yield
-    task.cancel()
+    stop_snapshot_recorder()
     await provider.stop()
 
 

@@ -1,4 +1,4 @@
-"""Watchlist endpoints: list, add, remove tickers."""
+"""Watchlist API routes."""
 
 import uuid
 from datetime import datetime, timezone
@@ -7,109 +7,92 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.prices import price_cache
+from app.market.cache import price_cache
 
-router = APIRouter(prefix="/api/watchlist")
-
-USER_ID = "default"
+router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
 
 class AddTickerRequest(BaseModel):
     ticker: str
 
 
-class WatchlistItemOut(BaseModel):
+class WatchlistItem(BaseModel):
     ticker: str
     price: float | None = None
     previous_price: float | None = None
     change_percent: float | None = None
 
 
-@router.get("")
-async def get_watchlist() -> list[WatchlistItemOut]:
+@router.get("", response_model=list[WatchlistItem])
+async def get_watchlist():
+    """Return watchlist tickers with latest prices from price cache."""
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT ticker FROM watchlist WHERE user_id = ? ORDER BY added_at",
-            (USER_ID,),
+            "SELECT ticker FROM watchlist WHERE user_id = 'default' ORDER BY added_at"
         )
         rows = await cursor.fetchall()
-
         items = []
-        for r in rows:
-            ticker = r["ticker"]
-            entry = price_cache.get(ticker)
-            if entry:
-                prev = entry.previous_price
-                change_pct = ((entry.price - prev) / prev * 100) if prev else None
-                items.append(WatchlistItemOut(
+        for row in rows:
+            ticker = row["ticker"]
+            update = price_cache.get(ticker)
+            if update:
+                prev = update.previous_price
+                change_pct = ((update.price - prev) / prev * 100) if prev else None
+                items.append(WatchlistItem(
                     ticker=ticker,
-                    price=entry.price,
+                    price=update.price,
                     previous_price=prev,
-                    change_percent=round(change_pct, 4) if change_pct is not None else None,
+                    change_percent=round(change_pct, 2) if change_pct is not None else None,
                 ))
             else:
-                items.append(WatchlistItemOut(ticker=ticker))
-
+                items.append(WatchlistItem(ticker=ticker))
         return items
     finally:
         await db.close()
 
 
-@router.post("")
-async def add_ticker(req: AddTickerRequest) -> WatchlistItemOut:
-    ticker = req.ticker.upper().strip()
+@router.post("", response_model=WatchlistItem)
+async def add_ticker(body: AddTickerRequest):
+    """Add a ticker to the watchlist."""
+    ticker = body.ticker.upper().strip()
     if not ticker:
-        raise HTTPException(400, "ticker is required")
+        raise HTTPException(status_code=400, detail="Ticker is required")
 
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT id FROM watchlist WHERE user_id = ? AND ticker = ?",
-            (USER_ID, ticker),
+            "SELECT id FROM watchlist WHERE user_id = 'default' AND ticker = ?",
+            (ticker,),
         )
         if await cursor.fetchone():
-            raise HTTPException(409, f"{ticker} already in watchlist")
+            raise HTTPException(status_code=409, detail=f"{ticker} already in watchlist")
 
         now = datetime.now(timezone.utc).isoformat()
         await db.execute(
-            "INSERT INTO watchlist (id, user_id, ticker, added_at) VALUES (?, ?, ?, ?)",
-            (str(uuid.uuid4()), USER_ID, ticker, now),
+            "INSERT INTO watchlist (id, user_id, ticker, added_at) VALUES (?, 'default', ?, ?)",
+            (str(uuid.uuid4()), ticker, now),
         )
         await db.commit()
-
-        # Register with price cache so market data system picks it up
-        price_cache.add_ticker(ticker)
-
-        entry = price_cache.get(ticker)
-        if entry:
-            prev = entry.previous_price
-            change_pct = ((entry.price - prev) / prev * 100) if prev else None
-            return WatchlistItemOut(
-                ticker=ticker,
-                price=entry.price,
-                previous_price=prev,
-                change_percent=round(change_pct, 4) if change_pct is not None else None,
-            )
-        return WatchlistItemOut(ticker=ticker)
+        update = price_cache.get(ticker)
+        return WatchlistItem(ticker=ticker, price=update.price if update else None)
     finally:
         await db.close()
 
 
 @router.delete("/{ticker}")
 async def remove_ticker(ticker: str):
+    """Remove a ticker from the watchlist."""
     ticker = ticker.upper().strip()
     db = await get_db()
     try:
         cursor = await db.execute(
-            "DELETE FROM watchlist WHERE user_id = ? AND ticker = ?",
-            (USER_ID, ticker),
+            "DELETE FROM watchlist WHERE user_id = 'default' AND ticker = ?",
+            (ticker,),
         )
         await db.commit()
         if cursor.rowcount == 0:
-            raise HTTPException(404, f"{ticker} not in watchlist")
-
-        price_cache.remove_ticker(ticker)
+            raise HTTPException(status_code=404, detail=f"{ticker} not in watchlist")
         return {"ok": True}
     finally:
         await db.close()
