@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,16 +9,24 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
+from app.portfolio import router as portfolio_router
+from app.watchlist import router as watchlist_router
+from app.snapshots import snapshot_loop
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
+    """Initialize database and start background tasks."""
     await init_db()
+    task = asyncio.create_task(snapshot_loop())
     yield
+    task.cancel()
 
 
 app = FastAPI(title="FinAlly", lifespan=lifespan)
+
+app.include_router(portfolio_router)
+app.include_router(watchlist_router)
 
 
 @app.get("/api/health")
