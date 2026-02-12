@@ -1,17 +1,82 @@
 "use client";
 
-import { useState } from "react";
-import Header, { ConnectionStatus } from "@/components/Header";
+import { useState, useEffect, useCallback } from "react";
+import Header from "@/components/Header";
 import Panel from "@/components/Panel";
+import PortfolioHeatmap from "@/components/PortfolioHeatmap";
+import PnlChart from "@/components/PnlChart";
+import PositionsTable from "@/components/PositionsTable";
+import TradeBar from "@/components/TradeBar";
+import { useMarketData } from "@/hooks/useMarketData";
+import { api } from "@/lib/api";
+import type { PortfolioResponse, SnapshotResponse, Position } from "@/lib/api";
 
 export default function Home() {
-  const [connectionStatus] = useState<ConnectionStatus>("disconnected");
+  const { prices, connectionStatus } = useMarketData();
+  const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
+  const [snapshots, setSnapshots] = useState<SnapshotResponse[]>([]);
+
+  const fetchPortfolio = useCallback(async () => {
+    try {
+      setPortfolio(await api.getPortfolio());
+    } catch {
+      /* backend not ready yet */
+    }
+  }, []);
+
+  const fetchSnapshots = useCallback(async () => {
+    try {
+      setSnapshots(await api.getPortfolioHistory());
+    } catch {
+      /* backend not ready yet */
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPortfolio();
+    fetchSnapshots();
+    const id = setInterval(() => {
+      fetchPortfolio();
+      fetchSnapshots();
+    }, 15_000);
+    return () => clearInterval(id);
+  }, [fetchPortfolio, fetchSnapshots]);
+
+  // Merge live SSE prices into positions
+  const positions: Position[] = (portfolio?.positions ?? []).map((p) => {
+    const live = prices[p.ticker];
+    if (!live) return p;
+    const currentPrice = live.price;
+    const costBasis = p.avg_cost * p.quantity;
+    const marketValue = currentPrice * p.quantity;
+    const unrealizedPnl = marketValue - costBasis;
+    const pnlPercent = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0;
+    return {
+      ...p,
+      current_price: currentPrice,
+      unrealized_pnl: unrealizedPnl,
+      pnl_percent: pnlPercent,
+    };
+  });
+
+  // Compute live total value
+  const totalPositionValue = positions.reduce(
+    (sum, p) => sum + p.current_price * p.quantity,
+    0,
+  );
+  const cashBalance = portfolio?.cash_balance ?? 10000;
+  const totalValue = portfolio ? totalPositionValue + cashBalance : 10000;
+
+  function handleTradeExecuted() {
+    fetchPortfolio();
+    fetchSnapshots();
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <Header
-        totalValue={10000}
-        cashBalance={10000}
+        totalValue={totalValue}
+        cashBalance={cashBalance}
         connectionStatus={connectionStatus}
       />
 
@@ -28,14 +93,26 @@ export default function Home() {
 
             {/* Right column: portfolio views */}
             <div className="flex w-72 shrink-0 flex-col gap-1">
-              <Panel title="Portfolio Heatmap" className="flex-1" />
-              <Panel title="P&L" className="flex-1" />
-              <Panel title="Positions" className="flex-1" />
+              <Panel title="Portfolio Heatmap" className="flex-1 overflow-hidden">
+                <div className="h-full min-h-0">
+                  <PortfolioHeatmap positions={positions} />
+                </div>
+              </Panel>
+              <Panel title="P&L" className="flex-1 overflow-hidden">
+                <div className="h-full min-h-0">
+                  <PnlChart snapshots={snapshots} />
+                </div>
+              </Panel>
+              <Panel title="Positions" className="flex-1 overflow-auto">
+                <PositionsTable positions={positions} />
+              </Panel>
             </div>
           </div>
 
           {/* Trade bar */}
-          <Panel title="Trade" className="h-14 shrink-0" />
+          <Panel title="Trade" className="h-14 shrink-0">
+            <TradeBar onTradeExecuted={handleTradeExecuted} />
+          </Panel>
         </div>
 
         {/* Chat sidebar */}
