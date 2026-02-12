@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.chat import router as chat_router
 from app.database import init_db
 from app.market.provider import create_provider
 from app.market.stream import router as stream_router
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="FinAlly", lifespan=lifespan)
+app.include_router(chat_router)
 
 app.include_router(stream_router)
 app.include_router(portfolio_router)
