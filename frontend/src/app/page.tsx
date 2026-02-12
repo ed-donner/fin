@@ -1,12 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import Header, { ConnectionStatus } from "@/components/Header";
+import Header from "@/components/Header";
 import Panel from "@/components/Panel";
 import ChatPanel from "@/components/ChatPanel";
+import Watchlist from "@/components/Watchlist";
+import MainChart from "@/components/MainChart";
+import { useMarketData } from "@/hooks/useMarketData";
 
 export default function Home() {
-  const [connectionStatus] = useState<ConnectionStatus>("disconnected");
+  const { prices, connectionStatus, priceHistory } = useMarketData();
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -22,10 +26,22 @@ export default function Home() {
           {/* Top row: watchlist + chart + portfolio */}
           <div className="flex min-h-0 flex-1 gap-1">
             {/* Watchlist */}
-            <Panel title="Watchlist" className="w-64 shrink-0 overflow-auto" />
+            <Panel title="Watchlist" className="w-64 shrink-0 overflow-auto">
+              <Watchlist
+                prices={prices}
+                priceHistory={priceHistory}
+                selectedTicker={selectedTicker}
+                onSelectTicker={setSelectedTicker}
+              />
+            </Panel>
 
             {/* Main chart */}
-            <Panel title="Chart" className="min-w-0 flex-1" />
+            <Panel title="Chart" className="min-w-0 flex-1">
+              <MainChart
+                ticker={selectedTicker}
+                priceHistory={priceHistory}
+              />
+            </Panel>
 
             {/* Right column: portfolio views */}
             <div className="flex w-72 shrink-0 flex-col gap-1">

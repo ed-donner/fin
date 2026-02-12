@@ -12,10 +12,15 @@ export interface PriceUpdate {
 }
 
 export type PriceMap = Record<string, PriceUpdate>;
+export type PriceHistory = Record<string, { price: number; time: string }[]>;
+
+const MAX_HISTORY = 500;
 
 export function useMarketData() {
   const [prices, setPrices] = useState<PriceMap>({});
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
+  const historyRef = useRef<PriceHistory>({});
+  const [historyVersion, setHistoryVersion] = useState(0);
   const esRef = useRef<EventSource | null>(null);
 
   const connect = useCallback(() => {
@@ -32,19 +37,30 @@ export function useMarketData() {
 
     es.onmessage = (event) => {
       const data = JSON.parse(event.data) as PriceUpdate | PriceUpdate[];
+      const updates = Array.isArray(data) ? data : [data];
+
       setPrices((prev) => {
         const next = { ...prev };
-        const updates = Array.isArray(data) ? data : [data];
         for (const u of updates) {
           next[u.ticker] = u;
         }
         return next;
       });
+
+      // Accumulate history
+      const h = historyRef.current;
+      for (const u of updates) {
+        if (!h[u.ticker]) h[u.ticker] = [];
+        h[u.ticker].push({ price: u.price, time: u.timestamp });
+        if (h[u.ticker].length > MAX_HISTORY) {
+          h[u.ticker] = h[u.ticker].slice(-MAX_HISTORY);
+        }
+      }
+      setHistoryVersion((v) => v + 1);
     };
 
     es.onerror = () => {
       setStatus("reconnecting");
-      // EventSource auto-reconnects; we just track the status
     };
   }, []);
 
@@ -55,5 +71,10 @@ export function useMarketData() {
     };
   }, [connect]);
 
-  return { prices, connectionStatus: status };
+  return {
+    prices,
+    connectionStatus: status,
+    priceHistory: historyRef.current,
+    historyVersion,
+  };
 }
