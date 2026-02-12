@@ -96,7 +96,7 @@ export default function Home() {
         </div>
 
         {/* Chat sidebar */}
-        <ChatPanel />
+        <ChatPanel onDataRefresh={refreshPortfolio} />
       </div>
     </div>
   );

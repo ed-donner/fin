@@ -117,6 +117,57 @@ describe("ChatPanel", () => {
     });
   });
 
+  it("calls onDataRefresh after trades", async () => {
+    const onDataRefresh = vi.fn();
+    vi.mocked(api.chat).mockResolvedValue({
+      message: "Bought 10 shares of AAPL",
+      trades: [{ ticker: "AAPL", side: "buy", quantity: 10 }],
+    });
+
+    render(<ChatPanel onDataRefresh={onDataRefresh} />);
+    const input = screen.getByPlaceholderText("Message...");
+    fireEvent.change(input, { target: { value: "Buy AAPL" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => {
+      expect(onDataRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("calls onDataRefresh after watchlist changes", async () => {
+    const onDataRefresh = vi.fn();
+    vi.mocked(api.chat).mockResolvedValue({
+      message: "Added TSLA to watchlist.",
+      watchlist_changes: [{ ticker: "TSLA", action: "add" }],
+    });
+
+    render(<ChatPanel onDataRefresh={onDataRefresh} />);
+    const input = screen.getByPlaceholderText("Message...");
+    fireEvent.change(input, { target: { value: "Add TSLA" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => {
+      expect(onDataRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not call onDataRefresh for plain messages", async () => {
+    const onDataRefresh = vi.fn();
+    vi.mocked(api.chat).mockResolvedValue({
+      message: "Hello! How can I help?",
+    });
+
+    render(<ChatPanel onDataRefresh={onDataRefresh} />);
+    const input = screen.getByPlaceholderText("Message...");
+    fireEvent.change(input, { target: { value: "hello" } });
+    fireEvent.click(screen.getByText("Send"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Hello! How can I help?")).toBeInTheDocument();
+    });
+    expect(onDataRefresh).not.toHaveBeenCalled();
+  });
+
   it("shows watchlist change badges", async () => {
     vi.mocked(api.chat).mockResolvedValue({
       message: "Done, added it.",
