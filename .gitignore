@@ -1,0 +1,19 @@
+.runtime/
+.claude/
+.beads/
+.logs/
+
+# Dependencies
+node_modules/
+__pycache__/
+.venv/
+
+# Environment
+.env
+
+# Database
+db/finally.db
+
+# Next.js
+.next/
+out/
