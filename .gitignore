@@ -17,3 +17,8 @@ db/finally.db
 # Next.js
 .next/
 out/
+
+# Test artifacts
+.pytest_cache/
+test-results/
+playwright-report/
