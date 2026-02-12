@@ -8,16 +8,23 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
+from app.market.provider import create_provider
+from app.market.stream import router as stream_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
+    """Initialize database and start market data provider."""
     await init_db()
+    provider = create_provider()
+    await provider.start()
     yield
+    await provider.stop()
 
 
 app = FastAPI(title="FinAlly", lifespan=lifespan)
+
+app.include_router(stream_router)
 
 
 @app.get("/api/health")
