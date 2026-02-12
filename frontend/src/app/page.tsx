@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Header, { ConnectionStatus } from "@/components/Header";
 import Panel from "@/components/Panel";
+import ChatPanel from "@/components/ChatPanel";
 
 export default function Home() {
   const [connectionStatus] = useState<ConnectionStatus>("disconnected");
@@ -39,10 +40,7 @@ export default function Home() {
         </div>
 
         {/* Chat sidebar */}
-        <Panel
-          title="AI Chat"
-          className="w-80 shrink-0 border-l border-border"
-        />
+        <ChatPanel />
       </div>
     </div>
   );
