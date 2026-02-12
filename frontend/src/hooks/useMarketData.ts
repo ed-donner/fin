@@ -35,7 +35,7 @@ export function useMarketData() {
       setStatus("connected");
     };
 
-    es.addEventListener("price", (event) => {
+    const onPrice = (event: MessageEvent) => {
       const data = JSON.parse(event.data) as PriceUpdate | PriceUpdate[];
       const updates = Array.isArray(data) ? data : [data];
 
@@ -57,7 +57,9 @@ export function useMarketData() {
         }
       }
       setHistoryVersion((v) => v + 1);
-    });
+    };
+
+    es.addEventListener("price", onPrice as EventListener);
 
     es.onerror = () => {
       setStatus("reconnecting");

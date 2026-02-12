@@ -88,18 +88,17 @@ export default function MainChart({ ticker, priceHistory }: MainChartProps) {
     }
   }, [ticker, priceHistory]);
 
-  if (!ticker) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-text-secondary">
-        Select a ticker from the watchlist
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-full flex-col">
-      <div className="mb-1 text-sm font-semibold text-accent-yellow">{ticker}</div>
+    <div className="relative flex h-full flex-col">
+      {ticker && (
+        <div className="mb-1 text-sm font-semibold text-accent-yellow">{ticker}</div>
+      )}
       <div ref={containerRef} className="min-h-0 flex-1" />
+      {!ticker && (
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-text-secondary">
+          Select a ticker from the watchlist
+        </div>
+      )}
     </div>
   );
 }
